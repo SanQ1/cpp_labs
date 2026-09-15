@@ -1,15 +1,15 @@
 // cpp1.cpp : Defines the entry point for the application.
-//
 
 #include "framework.h"
 #include "lab1.h"
+#include <string>
 
 #define MAX_LOADSTRING 100
 
 // Global Variables:
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
-WCHAR szOleksandrDaria[MAX_LOADSTRING];            // the main window class name
+WCHAR szOleksandrDaria[MAX_LOADSTRING];         // the main window class name
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -25,11 +25,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
-
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_LAB1, szOleksandrDaria, MAX_LOADSTRING);
+    wcscpy_s(szOleksandrDaria, L"OleksandrDaria");
+
     MyRegisterClass(hInstance);
 
     // Perform application initialization:
@@ -68,17 +67,17 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style = CS_HREDRAW | CS_VREDRAW | CS_BYTEALIGNCLIENT;
+    wcex.style = CS_BYTEALIGNCLIENT;
     wcex.lpfnWndProc = WndProc;
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
+    wcex.hIcon = LoadIcon(NULL, IDI_APPLICATION);              
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)CreateSolidBrush(RGB(255, 255, 255));
+    wcex.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);  
     wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_LAB1);
     wcex.lpszClassName = szOleksandrDaria;
-    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 
     return RegisterClassExW(&wcex);
 }
@@ -97,8 +96,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance; // Store instance handle in our global variable
 
-    HWND hWnd = CreateWindowW(szOleksandrDaria, szTitle, WS_OVERLAPPEDWINDOW | WS_BORDER | WS_CAPTION,
-        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+    HWND hWnd = CreateWindowW(szOleksandrDaria, szTitle,
+        WS_OVERLAPPEDWINDOW | WS_BORDER | WS_CAPTION,
+        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0,   
+        nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd)
     {
@@ -117,6 +118,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //  PURPOSE: Processes messages for the main window.
 //
 //  WM_COMMAND  - process the application menu
+//  WM_SIZE     - force redraw (клас без CS_HREDRAW/CS_VREDRAW)
 //  WM_PAINT    - Paint the main window
 //  WM_DESTROY  - post a quit message and return
 //
@@ -142,6 +144,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
     }
     break;
+    case WM_SIZE:
+        // стиль класу не містить CS_HREDRAW/CS_VREDRAW, тому перемальовуємо вручну
+        InvalidateRect(hWnd, NULL, TRUE);
+        break;
     case WM_PAINT:
     {
         PAINTSTRUCT ps;
@@ -150,9 +156,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         RECT rect;
         GetClientRect(hWnd, &rect);
 
-        std::wstring text = L"�����";
+        //отримання системних метрик 
+        int cxScreen  = GetSystemMetrics(SM_CXSCREEN);   //ширина екрану, точок
+        int cyScreen  = GetSystemMetrics(SM_CYSCREEN);   //висота екрану, точок
+        int cxHScroll = GetSystemMetrics(SM_CXHSCROLL);  //ширина горизонтальної смуги прокрутки
+        int cyHScroll = GetSystemMetrics(SM_CYHSCROLL);  // висота горизонтальної смуги прокрутки
+        int cxFrame   = GetSystemMetrics(SM_CXFRAME);    //ширина рамки вікна додатка
+        int cyFrame   = GetSystemMetrics(SM_CYFRAME);    //висота рамки вікна додатка
 
-        DrawText(hdc, text.c_str(), text.size(), &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+        std::wstring text =
+            L"Ширина екрану: " + std::to_wstring(cxScreen) + L" px\n" +
+            L"Висота екрану: " + std::to_wstring(cyScreen) + L" px\n" +
+            L"Ширина горизонтальної смуги прокрутки: " + std::to_wstring(cxHScroll) + L" px\n" +
+            L"Висота горизонтальної смуги прокрутки: " + std::to_wstring(cyHScroll) + L" px\n" +
+            L"Ширина рамки вікна: " + std::to_wstring(cxFrame) + L" px\n" +
+            L"Висота рамки вікна: " + std::to_wstring(cyFrame) + L" px";
+
+        rect.left += 10;
+        rect.top  += 10;
+
+        DrawTextW(hdc, text.c_str(), -1, &rect, DT_LEFT | DT_TOP | DT_WORDBREAK);
 
         EndPaint(hWnd, &ps);
     }
