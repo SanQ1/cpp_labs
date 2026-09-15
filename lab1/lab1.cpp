@@ -9,7 +9,7 @@
 // Global Variables:
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
-WCHAR szOleksandrDyachuk[MAX_LOADSTRING];            // the main window class name
+WCHAR szOleksandrDaria[MAX_LOADSTRING];            // the main window class name
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -29,7 +29,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_LAB1, szOleksandrDyachuk, MAX_LOADSTRING);
+    LoadStringW(hInstance, IDC_LAB1, szOleksandrDaria, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
     // Perform application initialization:
@@ -68,16 +68,16 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.style = CS_HREDRAW | CS_VREDRAW | CS_BYTEALIGNCLIENT;
     wcex.lpfnWndProc = WndProc;
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
     wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPLICATION));
     wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wcex.hbrBackground = (HBRUSH)CreateSolidBrush(RGB(255, 255, 255));
     wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_LAB1);
-    wcex.lpszClassName = szOleksandrDyachuk;
+    wcex.lpszClassName = szOleksandrDaria;
     wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
     return RegisterClassExW(&wcex);
@@ -97,7 +97,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance; // Store instance handle in our global variable
 
-    HWND hWnd = CreateWindowW(szOleksandrDyachuk, szTitle, WS_OVERLAPPEDWINDOW | WS_BORDER | WS_CAPTION,
+    HWND hWnd = CreateWindowW(szOleksandrDaria, szTitle, WS_OVERLAPPEDWINDOW | WS_BORDER | WS_CAPTION,
         CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd)
@@ -150,8 +150,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         RECT rect;
         GetClientRect(hWnd, &rect);
 
-        const wchar_t* str = L"hello";
-        TextOut(hdc, rect.left, rect.top, str, wcslen(str));
+        std::wstring text = L"Текст";
+
+        DrawText(hdc, text.c_str(), text.size(), &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 
         EndPaint(hWnd, &ps);
     }
