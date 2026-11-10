@@ -1,21 +1,30 @@
-// client2.cpp : Defines the entry point for the application.
-//
+// client2.cpp : Лаб5 - Кл 2
 
 #include "framework.h"
 #include "client2.h"
+#include <stdio.h>
+#include <string.h>
 
 #define MAX_LOADSTRING 100
 
-// Global Variables:
-HINSTANCE hInst;                                // current instance
-WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
-WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+static LPCWSTR MailslotName = L"\\\\.\\mailslot\\lab5";
 
-// Forward declarations of functions included in this code module:
+#define ID_CLIENT_SENDMSG 40001
+
+HINSTANCE hInst;
+WCHAR szTitle[MAX_LOADSTRING];
+WCHAR szWindowClass[MAX_LOADSTRING];
+
+static HWND hwndEdit = nullptr;                 // вікно-журнал (тільки читання)
+
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+
+static void Log(const wchar_t* text);
+static void BuildMessage(HWND hWnd, WCHAR* buf, int cch);
+static void SendMsg(HWND hWnd);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
@@ -25,14 +34,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // TODO: Place code here.
-
-    // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_CLIENT2, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
-    // Perform application initialization:
     if (!InitInstance(hInstance, nCmdShow))
     {
         return FALSE;
@@ -41,8 +46,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_CLIENT2));
 
     MSG msg;
-
-    // Main message loop:
     while (GetMessage(&msg, nullptr, 0, 0))
     {
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
@@ -55,13 +58,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return (int)msg.wParam;
 }
 
-
-
-//
-//  FUNCTION: MyRegisterClass()
-//
-//  PURPOSE: Registers the window class.
-//
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
@@ -83,22 +79,12 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     return RegisterClassExW(&wcex);
 }
 
-//
-//   FUNCTION: InitInstance(HINSTANCE, int)
-//
-//   PURPOSE: Saves instance handle and creates main window
-//
-//   COMMENTS:
-//
-//        In this function, we save the instance handle in a global variable and
-//        create and display the main program window.
-//
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-    hInst = hInstance; // Store instance handle in our global variable
+    hInst = hInstance;
 
     HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+        1000, 520, 420, 300, nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd)
     {
@@ -111,26 +97,115 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
     return TRUE;
 }
 
+// Додає рядок у вікно-журнал.
+static void Log(const wchar_t* text)
+{
+    int len = GetWindowTextLengthW(hwndEdit);
+    SendMessageW(hwndEdit, EM_SETSEL, (WPARAM)len, (LPARAM)len);
+    SendMessageW(hwndEdit, EM_REPLACESEL, FALSE, (LPARAM)text);
+    SendMessageW(hwndEdit, EM_REPLACESEL, FALSE, (LPARAM)L"\r\n");
+}
+
 //
-//  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
+//  FUNCTION: BuildMessage()
 //
-//  PURPOSE: Processes messages for the main window.
+//  PURPOSE: формує дані клієнта 2 (варіант 1).
 //
-//  WM_COMMAND  - process the application menu
-//  WM_PAINT    - Paint the main window
-//  WM_DESTROY  - post a quit message and return
+static void BuildMessage(HWND hWnd, WCHAR* buf, int cch)
+{
+    // ширина та висота іконки додатку
+    int iconW = GetSystemMetrics(SM_CXICON);
+    int iconH = GetSystemMetrics(SM_CYICON);
+
+    // ширина вертикальної полоси прокрутки
+    int scrollW = GetSystemMetrics(SM_CXVSCROLL);
+
+    // глибина кольору (біт на піксель)
+    HDC hdc = GetDC(hWnd);
+    int colorDepth = GetDeviceCaps(hdc, BITSPIXEL);
+    ReleaseDC(hWnd, hdc);
+
+    swprintf_s(buf, cch,
+        L"Дані Клієнта #2:\r\n"
+        L" - ширина іконки (SM_CXICON) = %d px\r\n"
+        L" - висота іконки (SM_CYICON) = %d px\r\n"
+        L" - ширина вертикальної прокрутки (SM_CXVSCROLL) = %d px\r\n"
+        L" - глибина кольору (BITSPIXEL) = %d біт",
+        iconW, iconH, scrollW, colorDepth);
+}
+
 //
+//  FUNCTION: SendMsg(HWND)
 //
+//  PURPOSE: відкриває поштову скриньку сервера і записує в неї повідомлення
+//           (рядок UTF-16 з нулем, менше 256 символів - сервер читає 512 байт).
+//
+static void SendMsg(HWND hWnd)
+{
+    WCHAR szBuf[256];
+    BuildMessage(hWnd, szBuf, 256);
+
+    HANDLE hMailslot = CreateFileW(MailslotName, GENERIC_WRITE, FILE_SHARE_READ,
+        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hMailslot == INVALID_HANDLE_VALUE)
+    {
+        WCHAR err[128];
+        swprintf_s(err, 128, L"Помилка поштового серверу: %lu (сервер запущено? MailSlot -> Create)",
+            GetLastError());
+        Log(err);
+        return;
+    }
+
+    DWORD cbWritten = 0;
+    BOOL ok = WriteFile(hMailslot, szBuf, (DWORD)((wcslen(szBuf) + 1) * sizeof(WCHAR)),
+        &cbWritten, NULL);
+    CloseHandle(hMailslot);
+
+    if (ok)
+    {
+        Log(L"");
+        Log(L"Дані надіслані серверу:");
+        Log(szBuf);
+    }
+    else
+    {
+        WCHAR err[128];
+        swprintf_s(err, 128, L"Помилка надсилання повідомлення: %lu", GetLastError());
+        Log(err);
+    }
+}
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+    case WM_CREATE:
+    {
+        hwndEdit = CreateWindowW(L"EDIT", nullptr,
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_LEFT | ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY,
+            0, 0, 400, 200, hWnd, nullptr, hInst, nullptr);
+
+        HMENU hMenu = GetMenu(hWnd);
+        HMENU hClient = CreatePopupMenu();
+        AppendMenuW(hClient, MF_STRING, ID_CLIENT_SENDMSG, L"Send message");
+        InsertMenuW(hMenu, 1, MF_BYPOSITION | MF_POPUP, (UINT_PTR)hClient, L"&Client");
+        DrawMenuBar(hWnd);
+
+        Log(L"Клієнт 2 (поштова скринька). Client -> Send message");
+    }
+    break;
+    case WM_SIZE:
+        if (hwndEdit)
+            MoveWindow(hwndEdit, 0, 0, LOWORD(lParam), HIWORD(lParam), TRUE);
+        break;
     case WM_COMMAND:
     {
         int wmId = LOWORD(wParam);
-        // Parse the menu selections:
         switch (wmId)
         {
+        case ID_CLIENT_SENDMSG:
+            SendMsg(hWnd);
+            break;
         case IDM_ABOUT:
             DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
             break;
@@ -146,7 +221,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
-        // TODO: Add any drawing code that uses hdc here...
+        UNREFERENCED_PARAMETER(hdc);
         EndPaint(hWnd, &ps);
     }
     break;
@@ -159,7 +234,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
-// Message handler for about box.
 INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     UNREFERENCED_PARAMETER(lParam);
